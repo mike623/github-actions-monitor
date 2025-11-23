@@ -11,7 +11,7 @@ export function LoginButton() {
       provider: "github",
       options: {
         redirectTo: `${location.origin}/auth/callback`,
-        scopes: "read:user user:email repo",
+        scopes: "read:user user:email read:org repo",
       },
     });
   };

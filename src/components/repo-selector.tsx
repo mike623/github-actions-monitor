@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, Plus, Loader2 } from "lucide-react";
+import { Search, Plus, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,8 +11,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { searchRepos, saveRepo, getUserRepos } from "@/lib/actions";
-// Actually I should install toast. I'll use simple alert or console for now to avoid context switching, or just handle errors gracefully.
+import { searchRepos, saveRepo, getUserRepos, getUserOrgs, getOrgRepos } from "@/lib/actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function RepoSelector() {
   const [open, setOpen] = React.useState(false);
@@ -20,17 +26,41 @@ export function RepoSelector() {
   const [results, setResults] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState<string | null>(null);
+  const [orgs, setOrgs] = React.useState<any[]>([]);
+  const [selectedOrg, setSelectedOrg] = React.useState<string>("personal");
 
-  // Auto-fetch user repos on open
+  // Fetch user repos and orgs on open
   React.useEffect(() => {
-    if (open && !query) {
+    if (open) {
       setLoading(true);
-      getUserRepos()
-        .then((items) => setResults(items))
+      Promise.all([getUserRepos(), getUserOrgs()])
+        .then(([repos, organizations]) => {
+          if (!query && selectedOrg === "personal") {
+            setResults(repos);
+          }
+          setOrgs(organizations);
+        })
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [open, query]);
+  }, [open]);
+
+  // Handle Org change
+  React.useEffect(() => {
+    if (!open) return;
+
+    setQuery(""); // Clear search when switching context
+    setLoading(true);
+
+    const fetcher = selectedOrg === "personal"
+      ? getUserRepos()
+      : getOrgRepos(selectedOrg);
+
+    fetcher
+      .then((items) => setResults(items))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [selectedOrg, open]);
 
   // Debounce search
   React.useEffect(() => {
@@ -64,6 +94,7 @@ export function RepoSelector() {
       setOpen(false);
       setQuery("");
       setResults([]);
+      setSelectedOrg("personal");
     } catch (error) {
       console.error(error);
     } finally {
@@ -84,16 +115,32 @@ export function RepoSelector() {
           <DialogTitle>Add Repository</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              placeholder="Search repositories..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <Button type="submit" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            </Button>
-          </form>
+          <div className="flex gap-2">
+            <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Select scope" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="personal">Personal</SelectItem>
+                {orgs.map((org) => (
+                  <SelectItem key={org.id} value={org.login}>
+                    {org.login}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+              <Input
+                placeholder="Search..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <Button type="submit" disabled={loading} size="icon">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              </Button>
+            </form>
+          </div>
+
           <div className="max-h-[300px] overflow-y-auto space-y-2">
             {results.map((repo) => (
               <div
@@ -101,7 +148,10 @@ export function RepoSelector() {
                 className="flex items-center justify-between p-2 border rounded-md"
               >
                 <div className="flex flex-col overflow-hidden">
-                  <span className="font-medium truncate">{repo.full_name}</span>
+                  <span className="font-medium truncate flex items-center gap-2">
+                    {repo.full_name}
+                    {repo.private && <Lock className="h-3 w-3 text-muted-foreground" />}
+                  </span>
                   <span className="text-xs text-muted-foreground truncate">
                     {repo.description}
                   </span>
@@ -120,7 +170,7 @@ export function RepoSelector() {
                 </Button>
               </div>
             ))}
-            {results.length === 0 && !loading && query && (
+            {results.length === 0 && !loading && (
               <p className="text-center text-sm text-muted-foreground">
                 No repositories found.
               </p>

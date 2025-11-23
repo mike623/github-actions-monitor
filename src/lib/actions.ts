@@ -213,3 +213,43 @@ export async function getUserRepos() {
     return [];
   }
 }
+
+export async function getUserOrgs() {
+  const session = await getSession();
+  if (!session?.user) return [];
+
+  const token = session.provider_token;
+  if (!token) return [];
+
+  const octokit = getGithubClient(token);
+
+  try {
+    const { data } = await octokit.orgs.listForAuthenticatedUser();
+    return data;
+  } catch (error) {
+    console.error("Error fetching user orgs:", error);
+    return [];
+  }
+}
+
+export async function getOrgRepos(org: string) {
+  const session = await getSession();
+  if (!session?.user) return [];
+
+  const token = session.provider_token;
+  if (!token) return [];
+
+  const octokit = getGithubClient(token);
+
+  try {
+    const { data } = await octokit.repos.listForOrg({
+      org,
+      sort: "updated",
+      per_page: 20,
+    });
+    return data;
+  } catch (error) {
+    console.error(`Error fetching repos for org ${org}:`, error);
+    return [];
+  }
+}
