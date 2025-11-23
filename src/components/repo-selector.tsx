@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { searchRepos, saveRepo } from "@/lib/actions";
+import { searchRepos, saveRepo, getUserRepos } from "@/lib/actions";
 // Actually I should install toast. I'll use simple alert or console for now to avoid context switching, or just handle errors gracefully.
 
 export function RepoSelector() {
@@ -21,8 +21,30 @@ export function RepoSelector() {
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Auto-fetch user repos on open
+  React.useEffect(() => {
+    if (open && !query) {
+      setLoading(true);
+      getUserRepos()
+        .then((items) => setResults(items))
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [open, query]);
+
+  // Debounce search
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query.length > 3) {
+        handleSearch();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!query.trim()) return;
     setLoading(true);
     try {

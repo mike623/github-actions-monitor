@@ -3,6 +3,7 @@ import { RepoList } from "@/components/repo-list";
 import { RepoSelector } from "@/components/repo-selector";
 import { UserNav } from "@/components/user-nav";
 import { LoginButton } from "@/components/login-button";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -38,6 +39,7 @@ export default async function Home() {
         <div className="flex h-16 items-center px-4 container mx-auto">
           <h2 className="text-lg font-semibold">Actions Monitor</h2>
           <div className="ml-auto flex items-center space-x-4">
+            <ModeToggle />
             <RepoSelector />
             <UserNav user={user} />
           </div>

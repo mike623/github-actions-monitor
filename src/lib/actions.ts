@@ -174,9 +174,42 @@ export async function searchRepos(query: string) {
       q: query,
       per_page: 10,
     });
-    return data.items;
+
+    const username = session.user.user_metadata.user_name || session.user.user_metadata.login; // Supabase stores github username in metadata
+
+    return data.items.sort((a, b) => {
+      const aIsOwner = a.owner?.login === username;
+      const bIsOwner = b.owner?.login === username;
+
+      if (aIsOwner && !bIsOwner) return -1;
+      if (!aIsOwner && bIsOwner) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
   } catch (error) {
     console.error("Error searching repos:", error);
+    return [];
+  }
+}
+
+export async function getUserRepos() {
+  const session = await getSession();
+  if (!session?.user) return [];
+
+  const token = session.provider_token;
+  if (!token) return [];
+
+  const octokit = getGithubClient(token);
+
+  try {
+    const { data } = await octokit.repos.listForAuthenticatedUser({
+      sort: "updated",
+      per_page: 20,
+      visibility: "all",
+    });
+    return data;
+  } catch (error) {
+    console.error("Error fetching user repos:", error);
     return [];
   }
 }
